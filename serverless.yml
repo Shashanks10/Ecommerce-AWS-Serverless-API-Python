@@ -1,0 +1,184 @@
+service: ecommerce-api
+
+provider:
+  name: aws
+  runtime: python3.10
+  region: us-east-1
+  environment:
+    USERS_TABLE_NAME: MaxUser
+    PRODUCTS_TABLE_NAME: Products
+    CART_TABLE_NAME: Cart
+    ORDERS_TABLE_NAME: Orders
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE_NAME}
+        - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.PRODUCTS_TABLE_NAME}
+        - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CART_TABLE_NAME}
+        - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ORDERS_TABLE_NAME}
+        - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ORDERS_TABLE_NAME}/index/UserId-index
+
+functions:
+  registerUser:
+    handler: user_registration.register
+    environment:
+      TABLE_NAME: ${self:provider.environment.USERS_TABLE_NAME}
+    events:
+      - http:
+          path: /api/register
+          method: post
+          cors: true
+
+  searchProducts:
+    handler: product_search.search_products
+    environment:
+      TABLE_NAME: ${self:provider.environment.PRODUCTS_TABLE_NAME}
+    events:
+      - http:
+          path: /api/products
+          method: get
+          cors: true
+
+  addToCart:
+    handler: cart.add_to_cart
+    environment:
+      TABLE_NAME: ${self:provider.environment.CART_TABLE_NAME}
+    events:
+      - http:
+          path: /api/cart/add
+          method: post
+          cors: true
+
+  checkout:
+    handler: checkout.checkout
+    environment:
+      CART_TABLE_NAME: ${self:provider.environment.CART_TABLE_NAME}
+      ORDERS_TABLE_NAME: ${self:provider.environment.ORDERS_TABLE_NAME}
+    events:
+      - http:
+          path: /api/checkout
+          method: post
+          cors: true
+
+  trackOrder:
+    handler: order_tracking.track_order
+    environment:
+      TABLE_NAME: ${self:provider.environment.ORDERS_TABLE_NAME}
+    events:
+      - http:
+          path: /api/orders/{orderID}/status
+          method: get
+          cors: true
+
+  getUserProfile:
+    handler: get_user_profile.get_user_profile
+    environment:
+      USERS_TABLE_NAME: ${self:provider.environment.USERS_TABLE_NAME}
+    events:
+      - http:
+          path: /api/profile
+          method: get
+          cors: true
+
+  updateUserProfile:
+    handler: update_user_profile.update_user_profile
+    environment:
+      USERS_TABLE_NAME: ${self:provider.environment.USERS_TABLE_NAME}
+    events:
+      - http:
+          path: /api/profile
+          method: put
+          cors: true
+
+  removeFromCart:
+    handler: remove_from_cart.remove_from_cart
+    environment:
+      TABLE_NAME: ${self:provider.environment.CART_TABLE_NAME}
+    events:
+      - http:
+          path: /api/cart/remove
+          method: delete
+          cors: true
+
+  getOrderHistory:
+    handler: order_history.get_order_history
+    environment:
+      TABLE_NAME: ${self:provider.environment.ORDERS_TABLE_NAME}
+    events:
+      - http:
+          path: /api/orders
+          method: get
+          cors: true
+
+resources:
+  Resources:
+    UsersTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        TableName: ${self:provider.environment.USERS_TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: Email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: Email
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    ProductsTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        TableName: ${self:provider.environment.PRODUCTS_TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: ProductId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ProductId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    CartTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        TableName: ${self:provider.environment.CART_TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: UserId
+            AttributeType: S
+          - AttributeName: ProductId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: UserId
+            KeyType: HASH
+          - AttributeName: ProductId
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+    OrdersTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        TableName: ${self:provider.environment.ORDERS_TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: OrderId
+            AttributeType: S
+          - AttributeName: UserId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: OrderId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        GlobalSecondaryIndexes:
+          - IndexName: UserId-index
+            KeySchema:
+              - AttributeName: UserId
+                KeyType: HASH
+              - AttributeName: OrderId
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
