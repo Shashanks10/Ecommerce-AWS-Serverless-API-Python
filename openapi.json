@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://ilz4gdelo9.execute-api.us-east-1.amazonaws.com"
+      "url": "-------------------------------your api url--------------------------------"
     }
   ],
   "paths": {
